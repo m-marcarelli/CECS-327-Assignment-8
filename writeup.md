@@ -1,1 +1,0 @@
-This is where we research and document the IoT sensors we selected last week
