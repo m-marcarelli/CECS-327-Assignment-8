@@ -1,4 +1,5 @@
 # Client.py
+
 # ---------------------------------------------------------------
 # This file implements the TCP Client component for the IoT system.
 
