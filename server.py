@@ -176,6 +176,42 @@ def send_messages(client_socket):
         client_socket.send(message.encode())
         print(f"Message sent to client: {message}")
 
+def handle_query_2(conn, device_tree):
+    device_id = "392-szf-z5u-bh0"  # Smart Dishwasher UID
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT payload
+        FROM "Table 1_virtual"
+        WHERE payload ->> 'parent_asset_uid' = %s
+    """, (device_id,))
+
+    rows = cursor.fetchall()
+    water_readings_cups = []
+
+    for row in rows:
+        payload = row[0]
+        if isinstance(payload, str):
+            payload = json.loads(payload)
+
+        try:
+            raw_val = payload.get("Smart Dishwasher Consumption Sensor")
+            if raw_val:
+                water_cups = float(raw_val)
+                water_readings_cups.append(water_cups)
+        except Exception:
+            continue
+
+    cursor.close()
+
+    if not water_readings_cups:
+        return "No water usage data found for dishwasher."
+
+    avg_cups = sum(water_readings_cups) / len(water_readings_cups)
+    avg_gallons = avg_cups / 16  # Convert cups to gallons
+
+    return f"Average water consumption per cycle for your dishwasher: {avg_gallons:.2f} gallons."
+
 def start_server():
     port = int(input("Enter the port number for the server: "))
 
