@@ -92,18 +92,27 @@ class DeviceNode:
         self.left = None
         self.right = None
 
-def handle_client(client_socket):
-    # Receives messages from client and displays them (without capitalization)
+def handle_client(client_socket, conn, device_tree):
     while True:
         try:
-            # Receive message from client
             data = client_socket.recv(1024).decode()
 
             if not data:
                 print("Client disconnected.")
                 break
 
-            print(f"Received from client: {data}")  # Show original message from client
+            print(f"Received query from client: {data}")
+
+            if data == "1":
+                response = handle_query_1(conn, device_tree)
+            elif data == "2":
+                response = handle_query_2(conn, device_tree)
+            elif data == "3":
+                response = handle_query_3(conn, device_tree)
+            else:
+                response = "Invalid query number."
+
+            client_socket.send(response.encode())
 
         except ConnectionResetError:
             print("Client forcefully disconnected.")
