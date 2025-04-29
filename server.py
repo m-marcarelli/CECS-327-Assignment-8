@@ -28,7 +28,7 @@ import json
 # ---------------------------------------------------------------
 # Connecting to neonDB
 def connect_to_db():
-    connect = psycopg2.connect("postgresql://neondb_owner:npg_Cu7tJmQbGNg4@ep-calm-lake-a5oj4a07-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require")
+    connect = psycopg2.connect("postgresql://neondb_owner:npg_ylIsMtYO84SD@ep-morning-shadow-a4z1nstr-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require")
     return connect
 # ---------------------------------------------------------------
 # Implement binary search tree (an efficient data structure for searching and managing the data)
