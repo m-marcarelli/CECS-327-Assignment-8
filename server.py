@@ -1,23 +1,22 @@
-"""
-Server.py
------------------------------------------------------------------
-This file implements the TCP Server component for the IoT system.
+# Server.py
 
-Responsibilities:
-- Connects to NeonDB to retrieve IoT sensor data
-- Builds a Binary Search Tree (BST) to manage device metadata efficiently
-- Handles queries from the TCP client to:
-    1. Calculate average fridge humidity over the last 3 hours
-    2. Determine average dishwasher water usage per cycle (in gallons)
-    3. Identify the device with the highest electricity consumption
+# ---------------------------------------------------------------
+# This file implements the TCP Server component for the IoT system.
 
-Device metadata is loaded from the "Table 1_metadata" table.
-Sensor readings are queried from the "Table 1_virtual" table.
+# Responsibilities:
+# - Connects to NeonDB to retrieve IoT sensor data
+# - Builds a Binary Search Tree (BST) to manage device metadata efficiently
+# - Handles queries from the TCP client to:
+#     1. Calculate average fridge humidity over the last 3 hours
+#     2. Determine average dishwasher water usage per cycle (in gallons)
+#     3. Identify the device with the highest electricity consumption
 
-This server expects the client to send query codes: "1", "2", or "3".
-It replies with processed, human-readable answers in imperial units and PST-adjusted timeframes.
------------------------------------------------------------------ 
-"""
+# Device metadata is loaded from the "Table 1_metadata" table.
+# Sensor readings are queried from the "Table 1_virtual" table.
+
+# This server expects the client to send query codes: "1", "2", or "3".
+# It replies with processed, human-readable answers in imperial units and PST-adjusted timeframes.
+# --------------------------------------------------------------- 
 # Imports
 import socket
 import threading
