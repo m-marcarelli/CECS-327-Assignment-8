@@ -1,7 +1,4 @@
 import socket
-import threading
-import pymongo
-from datetime import datetime, timedelta
 
 def TCP_client():
     try:
