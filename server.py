@@ -120,6 +120,49 @@ def handle_client(client_socket, conn, device_tree):
 
     client_socket.close()
 
+def handle_query_1(conn, device_tree):
+    device_id = "m38-e25-320-1z8"  # Fridge 1 device ID
+    cursor = conn.cursor()
+
+    # Get the current UTC time and compute 3 hours ago
+    three_hours_ago = int((datetime.now(datetime.timezone.utc) - timedelta(hours=3)).timestamp())
+
+    cursor.execute("""
+        SELECT payload
+        FROM "Table 1_virtual"
+        WHERE payload ->> 'parent_asset_uid' = %s
+    """, (device_id,))
+
+    rows = cursor.fetchall()
+
+    moisture_readings = []
+
+    for row in rows:
+        payload = row[0]
+
+        if isinstance(payload, str):
+            payload = json.loads(payload)
+
+        try:
+            timestamp = int(payload.get("timestamp", "0"))
+            if timestamp >= three_hours_ago:
+                raw_val = payload.get("Moisture Meter - Moisture Meter")
+                if raw_val:
+                    moisture = float(raw_val)
+                    moisture_readings.append(moisture)
+        except Exception:
+            continue
+
+    cursor.close()
+
+    if not moisture_readings:
+        return "No recent moisture readings found."
+
+    avg_moisture = sum(moisture_readings) / len(moisture_readings)
+    rh_percent = avg_moisture  # Assuming 0–100 scale
+
+    return f"Average Relative Humidity inside your fridge over the last 3 hours is: {rh_percent:.2f}%"
+
 def send_messages(client_socket):
     # Allows the server to send messages to the client manually
     while True:
@@ -141,19 +184,15 @@ def start_server():
     server_socket.listen(5)
     print(f"Server is listening on port {port}...")
 
+    conn = connect_to_db()
+    device_tree = build_device_tree(conn)
+
     client_socket, client_address = server_socket.accept()
     print(f"Connected to client: {client_address}")
 
-    # Start two threads: one for handling client messages, one for manual input
-    # Threads used so that client and server do not have to wait for each other, so they can send as many messages as desired whenever
-    receive_thread = threading.Thread(target=handle_client, args=(client_socket,))
-    send_thread = threading.Thread(target=send_messages, args=(client_socket,))
+    handle_client(client_socket, conn, device_tree)
 
-    receive_thread.start()
-    send_thread.start()
-
-    receive_thread.join()
-    send_thread.join()
+    conn.close()
 
 if __name__ == "__main__":
     start_server()
