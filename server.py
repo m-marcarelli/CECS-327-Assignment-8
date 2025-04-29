@@ -1,44 +1,12 @@
 import socket
 import threading
-import pymongo
+import psycopg2
 from datetime import datetime, timedelta
 
-# Utilize a binary search tree
-class DeviceNode:
-    def __init__(self, device_id, metadata):
-        self.device_id = device_id
-        self.metadata = metadata
-        self.left = None
-        self.right = None
-
-class DeviceBST:
-    def __init__(self):
-        self.root = None
-
-    def insert(self, device_id, metadata):
-        self.root = self._insert_recursive(self.root, device_id, metadata)
-
-    def _insert_recursive(self, node, device_id, metadata):
-        if node is None:
-            return DeviceNode(device_id, metadata)
-        if device_id < node.device_id:
-            node.left = self._insert_recursive(node.left, device_id, metadata)
-        else:
-            node.right = self._insert_recursive(node.right, device_id, metadata)
-        return node
-
-    def find(self, device_id):
-        return self._find_recursive(self.root, device_id)
-
-    def _find_recursive(self, node, device_id):
-        if node is None:
-            return None
-        if node.device_id == device_id:
-            return node.metadata
-        if device_id < node.device_id:
-            return self._find_recursive(node.left, device_id)
-        else:
-            return self._find_recursive(node.right, device_id)
+# Funct to connect to NeonDB
+def connect_to_db():
+    connect = psycopg2.connect("postgresql://neondb_owner:npg_Cu7tJmQbGNg4@ep-calm-lake-a5oj4a07-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require")
+    return connect
 
 def handle_client(client_socket):
     # Receives messages from client and displays them (without capitalization)
