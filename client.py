@@ -1,5 +1,26 @@
-import socket
+"""
+Client.py
+-----------------------------------------------------------------
+This file implements the TCP Client component for the IoT system.
 
+Responsibilities:
+- Connects to the TCP Server using user-specified IP address and port number
+- Displays a menu of valid queries to the user
+- Sends selected query codes ("1", "2", or "3") to the server
+- Receives and displays processed results from the server
+
+Valid Queries:
+1. What is the average moisture inside my kitchen fridge in the past three hours?
+2. What is the average water consumption per cycle in my smart dishwasher?
+3. Which device consumed more electricity among my three IoT devices?
+
+The client runs continuously until the user types 'exit'.
+-----------------------------------------------------------------
+"""
+# Imports
+import socket
+# ---------------------------------------------------------------
+# Client functionality
 def TCP_client():
     try:
         # get server ip and port from the user
@@ -52,6 +73,8 @@ def TCP_client():
         print(f"Error: {e}")
     finally:
         client_socket.close()
-
+# ---------------------------------------------------------------
+# Main
 if __name__ == "__main__":
     TCP_client()
+# ---------------------------------------------------------------
