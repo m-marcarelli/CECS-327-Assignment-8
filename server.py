@@ -17,6 +17,8 @@
 # This server expects the client to send query codes: "1", "2", or "3".
 # It replies with processed, human-readable answers in imperial units and PST-adjusted timeframes.
 # --------------------------------------------------------------- 
+
+# ---------------------------------------------------------------
 # Imports
 import socket
 import threading
