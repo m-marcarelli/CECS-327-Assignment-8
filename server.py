@@ -8,6 +8,16 @@ def connect_to_db():
     connect = psycopg2.connect("postgresql://neondb_owner:npg_Cu7tJmQbGNg4@ep-calm-lake-a5oj4a07-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require")
     return connect
 
+# Implement binary search tree 
+
+# Singular device node
+class DeviceNode:
+    def __init__(self, device_id, metadata):
+        self.device_id = device_id
+        self.metadata = metadata
+        self.left = None
+        self.right = None
+
 def handle_client(client_socket):
     # Receives messages from client and displays them (without capitalization)
     while True:
