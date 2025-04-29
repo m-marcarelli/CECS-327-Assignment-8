@@ -44,54 +44,42 @@ def build_device_tree(conn):
     bst = DeviceBST()
     cursor = conn.cursor()
 
-    # If you have a JSON field like 'payload' in the table, adjust this query
-    cursor.execute("SELECT * FROM \"Table 1_metadata\"")  # Quotes required due to spaces
+    cursor.execute('SELECT assetUid, assetType, customAttributes FROM "Table 1_metadata"')
 
-    rows = cursor.fetchall()
+    for row in cursor.fetchall():
+        device_id = row[0]
+        device_type = row[1]
+        custom_attrs = row[2]
 
-    for row in rows:
+        # Ensure the JSON is a dictionary
+        if isinstance(custom_attrs, str):
+            custom_attrs = json.loads(custom_attrs)
+
+        name = custom_attrs.get("name", "Unnamed Device")
+        timezone = "UTC"  # Set default; convert to PST later
+        unit = None
+
         try:
-            # If the device data is in a JSON column like 'payload', parse it:
-            json_blob = row[1]  # Adjust the index to match the correct column
+            boards = custom_attrs["children"]
+            for board in boards:
+                sensors = board["customAttributes"]["children"]
+                for sensor in sensors:
+                    u = sensor["customAttributes"].get("unit")
+                    if u:
+                        unit = u
+                        break
+        except KeyError:
+            pass
 
-            # Convert to dict if it's a string
-            if isinstance(json_blob, str):
-                device = json.loads(json_blob)
-            else:
-                device = json_blob  # Already dict
+        metadata = {
+            "device_id": device_id,
+            "name": name,
+            "type": device_type,
+            "unit": unit,
+            "timezone": timezone
+        }
 
-            device_id = device["assetUid"]
-            device_type = device.get("assetType", "Unknown")
-            name = device["customAttributes"].get("name", "Unnamed")
-            timezone = "UTC"  # You can update this later if you store it
-            unit = None
-
-            # Look for sensors and try to pull the first valid unit
-            try:
-                boards = device["customAttributes"]["children"]
-                for board in boards:
-                    sensors = board["customAttributes"]["children"]
-                    for sensor in sensors:
-                        u = sensor["customAttributes"].get("unit")
-                        if u:
-                            unit = u
-                            break
-            except Exception:
-                pass
-
-            metadata = {
-                "device_id": device_id,
-                "name": name,
-                "type": device_type,
-                "unit": unit,
-                "timezone": timezone
-            }
-
-            bst.insert(device_id, metadata)
-
-        except Exception as e:
-            print(f"Error parsing row: {e}")
-            continue
+        bst.insert(device_id, metadata)
 
     cursor.close()
     return bst
