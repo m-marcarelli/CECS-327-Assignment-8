@@ -11,8 +11,8 @@
 #     2. Determine average dishwasher water usage per cycle (in gallons)
 #     3. Identify the device with the highest electricity consumption
 
-# Device metadata is loaded from the "Table 1_metadata" table.
-# Sensor readings are queried from the "Table 1_virtual" table.
+# Device metadata is loaded from the "query_table_metadata" table.
+# Sensor readings are queried from the "query_table_virtual" table.
 
 # This server expects the client to send query codes: "1", "2", or "3".
 # It replies with processed, human-readable answers in imperial units and PST-adjusted timeframes.
@@ -76,7 +76,7 @@ def build_device_tree(conn):
     bst = DeviceBST()
     cursor = conn.cursor()
 
-    cursor.execute('SELECT assetUid, assetType, customAttributes FROM "Table 1_metadata"')
+    cursor.execute('SELECT assetUid, assetType, customAttributes FROM "query_table_metadata"')
 
     for row in cursor.fetchall():
         device_id = row[0]
@@ -157,7 +157,7 @@ def handle_query_1(conn, device_tree):
 
     cursor.execute("""
         SELECT payload
-        FROM "Table 1_virtual"
+        FROM "query_table_virtual"
         WHERE payload ->> 'parent_asset_uid' = %s
     """, (device_id,))
 
@@ -210,7 +210,7 @@ def handle_query_2(conn, device_tree):
 
     cursor.execute("""
         SELECT payload
-        FROM "Table 1_virtual"
+        FROM "query_table_virtual"
         WHERE payload ->> 'parent_asset_uid' = %s
     """, (device_id,))
 
@@ -262,7 +262,7 @@ def handle_query_3(conn, device_tree):
     for name, device_id in device_ids.items():
         cursor.execute("""
             SELECT payload
-            FROM "Table 1_virtual"
+            FROM "query_table_virtual"
             WHERE payload ->> 'parent_asset_uid' = %s
         """, (device_id,))
         rows = cursor.fetchall()
