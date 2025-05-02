@@ -21,301 +21,204 @@
 # ---------------------------------------------------------------
 # Imports
 import socket
-import threading
 import psycopg2
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
+import pytz
 # ---------------------------------------------------------------
 # Connecting to neonDB
 def connect_to_db():
     connect = psycopg2.connect("postgresql://neondb_owner:npg_ylIsMtYO84SD@ep-morning-shadow-a4z1nstr-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require")
     return connect
 # ---------------------------------------------------------------
-# Implement binary search tree (an efficient data structure for searching and managing the data)
+# MetaData Constants
+TABLE_NAME = "query_table_virtual"
+FRIDGE = "00r-kzd-al2-8cz"
+DISHWASHER = "5kt-0b0-4xx-l5x"
+# ---------------------------------------------------------------
+# Time Conversion from UTC -> PST
+def conersion_to_pst(dt):
+    utc = pytz.utc
+    pst = pytz.timezone("US/Pacific")
+    return utc.localize(dt).astimezone(pst)
+# ---------------------------------------------------------------
+#Query Handling
+def server_query1():
+    """Average fridge moisture (sensor1) in past 3 hours"""
+    conn = connect_to_db()
+    cur = conn.cursor()
+    three_hours_ago = datetime.now(timezone.utc) - timedelta(hours=3)
+    print("[DEBUG] Looking for fridge data since:", three_hours_ago)
 
-# Singular device node
-class DeviceNode:
-    def __init__(self, device_id, metadata):
-        self.device_id = device_id
-        self.metadata = metadata
+    cur.execute(f"""
+        SELECT payload FROM {TABLE_NAME}
+        WHERE time >= %s
+        """, (three_hours_ago,))
+    rows = cur.fetchall()
+    moisture_vals = []
+
+    for row in rows:
+        payload = row[0]
+        if payload.get("parent_asset_uid") == FRIDGE:
+            for k, v in payload.items():
+                if "moisture" in k.lower():
+                    try:
+                        moisture_vals.append(float(v))
+                    except:
+                        continue
+
+    cur.close()
+    conn.close()
+
+    if not moisture_vals:
+        return "No fridge moisture data found"
+    
+    avg = sum(moisture_vals) / len(moisture_vals)
+    return f"The average moisture in your fridge (past 3 hours) is {avg:.2f} RH&."
+
+def server_query2():
+    """Average water usage per dishwasher cycle (in gallons)"""
+    conn = connect_to_db()
+    cur = conn.cursor()
+
+    cur.execute(f"SELECT payload from {TABLE_NAME}")
+    rows = cur.fetchall()
+    water_vals = []
+
+    for row in rows:
+        payload = row[0]
+        if payload.get("parent_asset_uid") == DISHWASHER:
+            for k, v in payload.items():
+                if "water" in k.lower():
+                    try:
+                        liters = float(v)
+                        gallons = liters * 0.264172
+                        water_vals.append(gallons)
+                    except:
+                        continue
+    cur.close()
+    conn.close()
+
+    if not water_vals:
+        return "No dishwasher water usage data found."
+    
+    avg = sum (water_vals) / len(water_vals)
+    return f"The average water per dishwasher cycle is {avg:.2f} gallons."
+
+class BSTNode:
+    def __init__(self, key, value):
+        self.key = key      # electricity usage
+        self.value = value  # device name
         self.left = None
         self.right = None
 
-# Base BST class
-class DeviceBST:
-    def __init__(self):
-        self.root = None
-
-    def insert(self, device_id, metadata):
-        self.root = self._insert_recursive(self.root, device_id, metadata)
-
-    def _insert_recursive(self, node, device_id, metadata):
-        if node is None:
-            return DeviceNode(device_id, metadata)
-        if device_id < node.device_id:
-            node.left = self._insert_recursive(node.left, device_id, metadata)
-        else:
-            node.right = self._insert_recursive(node.right, device_id, metadata)
-        return node
-
-    def find(self, device_id):
-        return self._find_recursive(self.root, device_id)
-
-    def _find_recursive(self, node, device_id):
-        if node is None:
-            return None
-        if node.device_id == device_id:
-            return node.metadata
-        if device_id < node.device_id:
-            return self._find_recursive(node.left, device_id)
-        else:
-            return self._find_recursive(node.right, device_id)
-
-# Insert devices into BST using metadata in neon
-def build_device_tree(conn):
-    bst = DeviceBST()
-    cursor = conn.cursor()
-
-    cursor.execute('SELECT assetUid, assetType, customAttributes FROM "query_table_metadata"')
-
-    for row in cursor.fetchall():
-        device_id = row[0]
-        device_type = row[1]
-        custom_attrs = row[2]
-
-        # Ensure the JSON is a dictionary
-        if isinstance(custom_attrs, str):
-            custom_attrs = json.loads(custom_attrs)
-
-        name = custom_attrs.get("name", "Unnamed Device")
-        timezone = "UTC"  # Set default; convert to PST later
-        unit = None
-
-        try:
-            boards = custom_attrs["children"]
-            for board in boards:
-                sensors = board["customAttributes"]["children"]
-                for sensor in sensors:
-                    u = sensor["customAttributes"].get("unit")
-                    if u:
-                        unit = u
-                        break
-        except KeyError:
-            pass
-
-        metadata = {
-            "device_id": device_id,
-            "name": name,
-            "type": device_type,
-            "unit": unit,
-            "timezone": timezone
-        }
-
-        bst.insert(device_id, metadata)
-
-    cursor.close()
-    return bst
-# ---------------------------------------------------------------
-# Handling / working with client program
-def handle_client(client_socket, conn, device_tree):
-    while True:
-        try:
-            data = client_socket.recv(1024).decode()
-
-            if not data:
-                print("Client disconnected.")
-                break
-
-            print(f"Received query from client: {data}")
-
-            if data == "1":
-                response = handle_query_1(conn, device_tree)
-            elif data == "2":
-                response = handle_query_2(conn, device_tree)
-            elif data == "3":
-                response = handle_query_3(conn, device_tree)
+    def insert(self, key, value):
+        if key < self.key:
+            if self.left:
+                self.left.insert(key, value)
             else:
-                response = "Invalid query number."
+                self.left = BSTNode(key, value)
+        else:
+            if self.right:
+                self.right.insert(key, value)
+            else:
+                self.right = BSTNode(key, value)
 
-            client_socket.send(response.encode())
+    def find_max(self):
+        if self.right:
+            return self.right.find_max()
+        return self.key, self.value
 
-        except ConnectionResetError:
-            print("Client forcefully disconnected.")
-            break
-
-    client_socket.close()
-# ---------------------------------------------------------------
-# Handle individual queries from client
-
-# Query 1
-def handle_query_1(conn, device_tree):
-    device_id = "m38-e25-320-1z8"  # Fridge 1 device ID
-    cursor = conn.cursor()
-
-    # Get the current UTC time and compute 3 hours ago
-    three_hours_ago = int((datetime.now(datetime.timezone.utc) - timedelta(hours=3)).timestamp())
-
-    cursor.execute("""
-        SELECT payload
-        FROM "query_table_virtual"
-        WHERE payload ->> 'parent_asset_uid' = %s
-    """, (device_id,))
-
-    rows = cursor.fetchall()
-    moisture_readings = []
-
-    for row in rows:
-        payload = row[0]
-
-        if isinstance(payload, str):
-            payload = json.loads(payload)
-
-        try:
-            timestamp = int(payload.get("timestamp", "0"))
-            if timestamp >= three_hours_ago:
-                raw_val = payload.get("Moisture Meter - Moisture Meter")
-                if raw_val:
-                    moisture = float(raw_val)
-                    moisture_readings.append(moisture)
-        except Exception:
-            continue
-
-    cursor.close()
-
-    if not moisture_readings:
-        return "No recent moisture readings found."
-
-    avg_moisture = sum(moisture_readings) / len(moisture_readings)
-    rh_percent = avg_moisture  # Assuming 0–100 scale
-
-    return f"Average Relative Humidity inside your fridge over the last 3 hours is: {rh_percent:.2f}%"
-
-def send_messages(client_socket):
-    # Allows the server to send messages to the client manually
-    while True:
-        message = input("Enter message to send to client (or 'exit' to quit): ").strip()
-
-        if message.lower() == 'exit':
-            print("Closing connection.")
-            client_socket.close()
-            break
-
-        client_socket.send(message.encode())
-        print(f"Message sent to client: {message}")
-
-# Query 2
-def handle_query_2(conn, device_tree):
-    device_id = "392-szf-z5u-bh0"  # Smart Dishwasher UID
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT payload
-        FROM "query_table_virtual"
-        WHERE payload ->> 'parent_asset_uid' = %s
-    """, (device_id,))
-
-    rows = cursor.fetchall()
-    water_readings_cups = []
-
-    for row in rows:
-        payload = row[0]
-        if isinstance(payload, str):
-            payload = json.loads(payload)
-
-        try:
-            raw_val = payload.get("Smart Dishwasher Consumption Sensor")
-            if raw_val:
-                water_cups = float(raw_val)
-                water_readings_cups.append(water_cups)
-        except Exception:
-            continue
-
-    cursor.close()
-
-    if not water_readings_cups:
-        return "No water usage data found for dishwasher."
-
-    avg_cups = sum(water_readings_cups) / len(water_readings_cups)
-    avg_gallons = avg_cups / 16  # Convert cups to gallons
-
-    return f"Average water consumption per cycle for your dishwasher: {avg_gallons:.2f} gallons."
-
-# Query 3
-def handle_query_3(conn, device_tree):
-    cursor = conn.cursor()
-
-    device_ids = {
-        "Fridge 1": "m38-e25-320-1z8",
-        "Fridge 2": "8c40c210-83ce-4eb2-9ec0-08cc823a91a8",
-        "Dishwasher": "392-szf-z5u-bh0"
-    }
-
-    # Map device names to sensor names (used in payload)
-    sensor_names = {
-        "Fridge 1": "ACS712 - Smart Fridge Ammeter",
-        "Fridge 2": "sensor 1 8c40c210-83ce-4eb2-9ec0-08cc823a91a8",
-        "Dishwasher": "ACS712 - Smart Dishwasher Ammeter"
-    }
-
-    device_totals = {}
-
-    for name, device_id in device_ids.items():
-        cursor.execute("""
-            SELECT payload
-            FROM "query_table_virtual"
-            WHERE payload ->> 'parent_asset_uid' = %s
-        """, (device_id,))
-        rows = cursor.fetchall()
-
-        total_current = 0.0
-        count = 0
-
-        for row in rows:
-            payload = row[0]
-            if isinstance(payload, str):
-                payload = json.loads(payload)
-
-            try:
-                raw_val = payload.get(sensor_names[name])
-                if raw_val:
-                    total_current += float(raw_val)
-                    count += 1
-            except Exception:
-                continue
-
-        device_totals[name] = total_current
-
-    cursor.close()
-
-    if not device_totals:
-        return "No electricity usage data available."
-
-    # Find the device with the most total current usage
-    max_device = max(device_totals, key=device_totals.get)
-    max_value = device_totals[max_device]
-
-    return f"{max_device} consumed the most electricity with a total current of {max_value:.2f} A."
-# ---------------------------------------------------------------
-# Start server and connect to client
-def start_server():
-    port = int(input("Enter the port number for the server: "))
-
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind(("0.0.0.0", port))
-    server_socket.listen(5)
-    print(f"Server is listening on port {port}...")
-
+def server_query3():
+    """Copare electricity usage using BST"""
     conn = connect_to_db()
-    device_tree = build_device_tree(conn)
+    cur = conn.cursor()
 
-    client_socket, client_address = server_socket.accept()
-    print(f"Connected to client: {client_address}")
+    cur.execute(f"SELECT payload from {TABLE_NAME}")
+    rows = cur.fetchall()
+    device_usage = {}
 
-    handle_client(client_socket, conn, device_tree)
+    for row in rows:
+        payload = row[0]
+        uid = payload.get("parent_asset_uid")
+        if uid == FRIDGE:
+            for k, v in payload.items():
+                if "moisture" in k.lower():
+                    try:
+                        device_usage["Fridge"] = device_usage.get("Fridge", 0) + float (v)
+                    except:
+                        continue
 
+        elif uid == DISHWASHER:
+            for k, v in payload.items():
+                if "acs" in k.lower():
+                    try:
+                        device_usage['Dishwasher'] = device_usage.get("Dishwasher", 0) + float(v)
+                    except:
+                        continue
+
+    cur.close()
     conn.close()
+
+    root = None
+    for device, usage in device_usage.items():
+        if root is None:
+            root = BSTNode(usage, device)
+        else:
+            root.insert(usage, device)
+
+    if root:
+        max_usage, device = root.find_max()
+        return f"{device} consumed the most electricity: {max_usage:.2f} kWh."
+    else:
+        return "No electricity data available to compare"
+# ---------------------------------------------------------------
+#TCP Server
+def TCP_server():
+    try:
+        server_port = int(input("Enter server port number:"))
+
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        server_socket.bind(('0.0.0.0', server_port))
+        server_socket.listen(5)
+
+        print(f"[SERVER] Server is listening on port {server_port}")
+
+        while True:
+            client_socket, client_address = server_socket.accept()
+            print(f"[SERVER]Connected to {client_address}")
+
+            while True:
+                data = client_socket.recv(1024)
+                if not data:
+                    print("[SERVER] Client disconnected.")
+                    break
+
+                query_code = data.decode().strip()
+                print(f"[SERVER] Recieved query code: {query_code}")
+
+                if query_code == "1":
+                    response = server_query1()
+                elif query_code == "2":
+                    response = server_query2()
+                elif query_code == "3":
+                    response = server_query3()
+
+                client_socket.sendall(response.encode())
+
+            client_socket.close()
+
+    except ValueError:
+        print("[ERROR] Invalid port number.")
+    finally:
+        if 'server_socket' in locals():
+            server_socket.close()
+        print("[SERVER] Server shut down.")
+    
 # ---------------------------------------------------------------
 # Main
 if __name__ == "__main__":
-    start_server()
+    TCP_server()
+    
 # ---------------------------------------------------------------

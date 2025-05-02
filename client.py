@@ -58,6 +58,7 @@ def TCP_client():
 
             # validate query
             if message in ['1', '2', '3']:
+                print(f"\nQuery sent: {valid_queries[int(message) - 1]}")
                 client_socket.send(bytearray(str(message), encoding='utf-8'))
                 server_response = client_socket.recv(1024)
                 print("Server response:", server_response.decode())
