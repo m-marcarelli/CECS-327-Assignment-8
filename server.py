@@ -5,11 +5,10 @@
 
 # Responsibilities:
 # - Connects to NeonDB to retrieve IoT sensor data
-# - Builds a Binary Search Tree (BST) to manage device metadata efficiently
 # - Handles queries from the TCP client to:
 #     1. Calculate average fridge humidity over the last 3 hours
 #     2. Determine average dishwasher water usage per cycle (in gallons)
-#     3. Identify the device with the highest electricity consumption
+#     3. Identify the device with the highest electricity consumption (USING A BSF)
 
 # Device metadata is loaded from the "query_table_metadata" table.
 # Sensor readings are queried from the "query_table_virtual" table.
